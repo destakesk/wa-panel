@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WA Router — Tıklama Paneli</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --grid: #e1e0d9; --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10); --series: #2a78d6; --bar-dim: #9ec5f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+      --muted: #898781; --grid: #2c2c2a; --baseline: #383835;
+      --border: rgba(255,255,255,0.10); --series: #3987e5; --bar-dim: #1c5cab;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between;
+           flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; }
+  .stamp { color: var(--muted); font-size: 13px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+           gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 10px; padding: 14px 16px; }
+  .tile .v { font-size: 28px; font-weight: 650; }
+  .tile .l { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  .card { background: var(--surface); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .card h2 { font-size: 14px; margin: 0 0 12px; color: var(--ink-2); font-weight: 600; }
+  /* gunluk bar grafik */
+  .chart { position: relative; height: 140px; display: flex; align-items: flex-end;
+           gap: 2px; border-bottom: 1px solid var(--baseline); }
+  .chart .b { flex: 1; min-width: 3px; background: var(--series);
+              border-radius: 4px 4px 0 0; position: relative; cursor: default; }
+  .chart .b.zero { height: 2px !important; background: var(--grid); border-radius: 0; }
+  .chart .b:hover { background: var(--bar-dim); }
+  .b .tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+            transform: translateX(-50%); background: var(--ink); color: var(--page);
+            font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+            z-index: 2; pointer-events: none; }
+  .b:hover .tip { display: block; }
+  .xlab { display: flex; justify-content: space-between; color: var(--muted);
+          font-size: 11px; margin-top: 6px; }
+  /* tablo */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px;
+       padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+  tr.site { cursor: pointer; }
+  tr.site:hover td { background: color-mix(in srgb, var(--series) 6%, transparent); }
+  .mag { display: inline-block; height: 8px; background: var(--series);
+         border-radius: 4px; vertical-align: middle; }
+  tr.detail td { background: color-mix(in srgb, var(--series) 4%, transparent);
+                 color: var(--ink-2); font-size: 13px; padding: 8px 8px 10px 24px; }
+  .numline { display: flex; gap: 12px; flex-wrap: wrap; }
+  .numline span { font-variant-numeric: tabular-nums; }
+  .caret { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.5; }
+  .err { background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+         border-radius: 10px; padding: 14px 16px; }
+  button.refresh { background: none; border: 1px solid var(--border); color: var(--ink-2);
+                   border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  button.refresh:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>WA Router — Tıklama Paneli</h1>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span class="stamp" id="stamp">yükleniyor…</span>
+      <button class="refresh" onclick="load()">Yenile</button>
+    </div>
+  </header>
+  <div class="tiles">
+    <div class="tile"><div class="v" id="t-today">–</div><div class="l">Bugün</div></div>
+    <div class="tile"><div class="v" id="t-7">–</div><div class="l">Son 7 gün</div></div>
+    <div class="tile"><div class="v" id="t-30">–</div><div class="l">Son 30 gün</div></div>
+    <div class="tile"><div class="v" id="t-total">–</div><div class="l">Toplam (25 Tem'den beri)</div></div>
+  </div>
+  <div class="card">
+    <h2>Günlük tıklama — tüm siteler, son 30 gün</h2>
+    <div class="chart" id="chart"></div>
+    <div class="xlab"><span id="x0"></span><span id="x1"></span></div>
+  </div>
+  <div class="card">
+    <h2>Siteler <span style="font-weight:400">(satıra tıkla → numara dağılımı)</span></h2>
+    <table>
+      <thead><tr><th>Site</th><th class="num">Bugün</th><th class="num">7 gün</th>
+        <th class="num">Toplam</th><th style="width:30%">Pay</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="note">Toplamlar 25 Temmuz 2026'dan itibaren sayılır; günlük kırılım
+    Europe/Istanbul gününe göredir. Numara dağılımı sıralı dağıtımdan hesaplanır —
+    bir sitenin numara listesi değişirse o sitenin dağılım hesabı o andan itibaren
+    kayar (toplam doğru kalır). Tek numaralı sayfalar 25 Tem akşamından itibaren sayılır.</div>
+  </div>
+</div>
+<script>
+var SITES = [{"repo": "trapianto-wa", "title": "Trapianto di Capelli", "numbers": ["355684003735", "355689052927", "355685077710", "355685655077", "355685055556"], "key": "destakesk.github.io/trapianto-wa/"}, {"repo": "estemoon-en", "title": "Estemoon Clinic", "numbers": ["905079326582", "905053661824", "905527315552", "905076918923", "905533299085", "905052766724", "905010745031"], "key": "destakesk.github.io/estemoon-en/"}, {"repo": "jobs", "title": "Jobs", "numbers": ["905533299126", "905533299626", "905060588521", "905076918931", "905076918924", "905058151468", "905533299681", "905053661824", "905075195985", "905011089426", "905050129325", "905530415721", "905533299554", "905533299547", "905075196148", "905536064717", "905060589611", "905533299545", "905536065315", "905533296976", "905536064636", "905536061771", "905536065616", "355683367259", "355684003735", "355685344795", "355685055556", "355682101785", "355685655077", "355686608592", "355689052927", "355684047545"], "key": "destakesk.github.io/jobs/"}, {"repo": "estemoon-de", "title": "Estemoon Clinic", "numbers": ["905533299085"], "key": "destakesk.github.io/estemoon-de/"}, {"repo": "estemoon-es", "title": "Estemoon Clinic", "numbers": ["905076918923", "905052766724", "905079326582"], "key": "destakesk.github.io/estemoon-es/"}, {"repo": "estemoon-fr", "title": "Estemoon Clinic", "numbers": ["905077854846"], "key": "destakesk.github.io/estemoon-fr/"}, {"repo": "estemoon-it", "title": "Estemoon Clinic", "numbers": ["905079326582", "905053661824", "905527315552", "905052766724", "905010745031"], "key": "destakesk.github.io/estemoon-it/"}, {"repo": "estemoon-era", "title": "Estemoon Clinic", "numbers": ["905079326582"], "key": "destakesk.github.io/estemoon-era/"}, {"repo": "estemoon-katerina", "title": "Estemoon Clinic", "numbers": ["905527315552"], "key": "destakesk.github.io/estemoon-katerina/"}, {"repo": "estemoon-bora", "title": "Estemoon Clinic", "numbers": ["905052766724"], "key": "destakesk.github.io/estemoon-bora/"}, {"repo": "estemoon-mimoza", "title": "Estemoon Clinic", "numbers": ["905076918923"], "key": "destakesk.github.io/estemoon-mimoza/"}, {"repo": "estemoon-eni", "title": "Estemoon Clinic", "numbers": ["905010745031"], "key": "destakesk.github.io/estemoon-eni/"}, {"repo": "istanbulcare-en", "title": "Istanbul Care", "numbers": ["905469035935", "905058146308", "905063977580", "905059092501", "905076918931", "905078209179", "905012530626"], "key": "destakesk.github.io/istanbulcare-en/"}, {"repo": "istanbulcare-fr", "title": "Istanbul Care", "numbers": ["905469035935", "905078599941"], "key": "destakesk.github.io/istanbulcare-fr/"}, {"repo": "istanbulcare-de", "title": "Istanbul Care", "numbers": ["905078209179"], "key": "destakesk.github.io/istanbulcare-de/"}, {"repo": "istanbulcare-es", "title": "Istanbul Care", "numbers": ["905058146308", "905076914201", "905012530626"], "key": "destakesk.github.io/istanbulcare-es/"}, {"repo": "istanbulcare-it", "title": "Istanbul Care", "numbers": ["905425571229", "905063977580", "905076918931"], "key": "destakesk.github.io/istanbulcare-it/"}, {"repo": "istanbulcare-eugen", "title": "Istanbul Care", "numbers": ["905059092501"], "key": "destakesk.github.io/istanbulcare-eugen/"}, {"repo": "istanbulcare-lundrim", "title": "Istanbul Care", "numbers": ["905078209179"], "key": "destakesk.github.io/istanbulcare-lundrim/"}, {"repo": "istanbulcare-daina", "title": "Istanbul Care", "numbers": ["905076914201"], "key": "destakesk.github.io/istanbulcare-daina/"}, {"repo": "istanbulcare-matilda", "title": "Istanbul Care", "numbers": ["905058146308"], "key": "destakesk.github.io/istanbulcare-matilda/"}, {"repo": "istanbulcare-abdu", "title": "Istanbul Care", "numbers": ["905469035935"], "key": "destakesk.github.io/istanbulcare-abdu/"}, {"repo": "istanbulcare-nouhaila", "title": "Istanbul Care", "numbers": ["905078599941"], "key": "destakesk.github.io/istanbulcare-nouhaila/"}, {"repo": "istanbulcare-eribert", "title": "Istanbul Care", "numbers": ["905533299626"], "key": "destakesk.github.io/istanbulcare-eribert/"}, {"repo": "royalhair-marsela", "title": "Royal Hair", "numbers": ["905521081656"], "key": "destakesk.github.io/royalhair-marsela/"}, {"repo": "royalhair-fiona", "title": "Royal Hair", "numbers": ["905524215552"], "key": "destakesk.github.io/royalhair-fiona/"}, {"repo": "royalhair-sidorela", "title": "Royal Hair", "numbers": ["905530415721"], "key": "destakesk.github.io/royalhair-sidorela/"}, {"repo": "royalhair-erida", "title": "Royal Hair", "numbers": ["905050128625"], "key": "destakesk.github.io/royalhair-erida/"}, {"repo": "royalhair-lule", "title": "Royal Hair", "numbers": ["905050146625"], "key": "destakesk.github.io/royalhair-lule/"}, {"repo": "royalhair-en", "title": "Royal Hair", "numbers": ["905521081656", "905524215552", "905530415721", "905050128625", "905050146625"], "key": "destakesk.github.io/royalhair-en/"}, {"repo": "royalhair-de", "title": "Royal Hair", "numbers": ["905530415721"], "key": "destakesk.github.io/royalhair-de/"}, {"repo": "royalhair-es", "title": "Royal Hair", "numbers": ["905050128625"], "key": "destakesk.github.io/royalhair-es/"}, {"repo": "jobs-api", "title": "Jobs", "numbers": ["905536065388", "905079344254", "905078596660", "905079320785", "905075941279", "905533299673"], "key": "destakesk.github.io/jobs-api/"}, {"repo": "royalhair-istanbul", "title": "Royal Hair Istanbul", "numbers": ["905060588025", "905536065618"], "key": "destakesk.github.io/royalhair-istanbul/"}, {"repo": "royalhair-it", "title": "Royal Hair", "numbers": ["905521081656", "905524215552", "905050146625"], "key": "destakesk.github.io/royalhair-it/"}];
+var RPC = "https://zmdbafqjtqlenleocukz.supabase.co/rest/v1/rpc";
+var KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptZGJhZnFqdHFsZW5sZW9jdWt6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0NzA0NDMsImV4cCI6MjA5MzA0NjQ0M30.bVUMLSwi37WlltqdZYVIkpIJUHgXnECYvSaj3C4iQtE";
+
+function rpc(fn, body) {
+  return fetch(RPC + "/" + fn, {
+    method: "POST",
+    headers: { "apikey": KEY, "Authorization": "Bearer " + KEY,
+               "Content-Type": "application/json" },
+    body: JSON.stringify(body || {})
+  }).then(function (r) { if (!r.ok) throw new Error(fn + " " + r.status); return r.json(); });
+}
+
+function istToday(offset) {
+  var d = new Date(Date.now() - (offset || 0) * 864e5);
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
+}
+
+function fmt(x) { return x.toLocaleString("tr-TR"); }
+
+function load() {
+  document.getElementById("stamp").textContent = "yükleniyor…";
+  Promise.all([rpc("wa_counts"), rpc("wa_daily", { p_days: 30 })])
+    .then(function (res) { render(res[0], res[1]); })
+    .catch(function (e) {
+      document.getElementById("stamp").textContent = "veri alınamadı: " + e.message;
+    });
+}
+
+function render(counts, daily) {
+  var totals = {};
+  counts.forEach(function (r) { totals[r.site] = r.n + 1; });
+
+  // gun -> toplam; site+gun -> tiklama
+  var byDay = {}, bySiteDay = {};
+  daily.forEach(function (r) {
+    byDay[r.day] = (byDay[r.day] || 0) + r.clicks;
+    bySiteDay[r.site + "|" + r.day] = r.clicks;
+  });
+
+  var today = istToday(0);
+  var days = [], sum7 = 0, sum30 = 0;
+  for (var i = 29; i >= 0; i--) {
+    var d = istToday(i);
+    var v = byDay[d] || 0;
+    days.push({ day: d, v: v });
+    sum30 += v;
+    if (i < 7) sum7 += v;
+  }
+  var grand = 0;
+  SITES.forEach(function (s) { grand += totals[s.key] || 0; });
+
+  document.getElementById("t-today").textContent = fmt(byDay[today] || 0);
+  document.getElementById("t-7").textContent = fmt(sum7);
+  document.getElementById("t-30").textContent = fmt(sum30);
+  document.getElementById("t-total").textContent = fmt(grand);
+
+  // grafik
+  var max = Math.max.apply(null, days.map(function (d) { return d.v; }).concat([1]));
+  var chart = document.getElementById("chart");
+  chart.innerHTML = "";
+  days.forEach(function (d) {
+    var b = document.createElement("div");
+    b.className = "b" + (d.v === 0 ? " zero" : "");
+    b.style.height = Math.max(4, Math.round(d.v / max * 100)) + "%";
+    var t = document.createElement("span");
+    t.className = "tip";
+    t.textContent = d.day.slice(5) + " — " + fmt(d.v) + " tıklama";
+    b.appendChild(t);
+    chart.appendChild(b);
+  });
+  document.getElementById("x0").textContent = days[0].day.slice(5);
+  document.getElementById("x1").textContent = days[days.length - 1].day.slice(5) + " (bugün)";
+
+  // tablo — toplam tiklamaya gore sirali
+  var list = SITES.map(function (s) {
+    var t = totals[s.key] || 0;
+    return { s: s, total: t,
+             today: bySiteDay[s.key + "|" + today] || 0,
+             w7: [0,1,2,3,4,5,6].reduce(function (a, i) {
+               return a + (bySiteDay[s.key + "|" + istToday(i)] || 0); }, 0) };
+  }).sort(function (a, b) { return b.total - a.total; });
+
+  var maxT = Math.max.apply(null, list.map(function (r) { return r.total; }).concat([1]));
+  var tb = document.getElementById("rows");
+  tb.innerHTML = "";
+  list.forEach(function (r) {
+    var tr = document.createElement("tr");
+    tr.className = "site";
+    tr.innerHTML = '<td><span class="caret">▸</span>' + r.s.repo + "</td>" +
+      '<td class="num">' + fmt(r.today) + "</td>" +
+      '<td class="num">' + fmt(r.w7) + "</td>" +
+      '<td class="num">' + fmt(r.total) + "</td>" +
+      '<td><span class="mag" style="width:' +
+      Math.max(2, Math.round(r.total / maxT * 100)) + '%"></span></td>';
+    var det = document.createElement("tr");
+    det.className = "detail";
+    det.style.display = "none";
+    var nums = r.s.numbers, L = nums.length, T = r.total;
+    var parts = nums.map(function (n, i) {
+      var c = Math.floor(T / L) + (i < T % L ? 1 : 0);
+      return "<span>" + n + ": <b>" + fmt(c) + "</b></span>";
+    });
+    det.innerHTML = '<td colspan="5"><div class="numline">' + parts.join("") + "</div></td>";
+    tr.onclick = function () {
+      var open = det.style.display !== "none";
+      det.style.display = open ? "none" : "";
+      tr.querySelector(".caret").textContent = open ? "▸" : "▾";
+    };
+    tb.appendChild(tr);
+    tb.appendChild(det);
+  });
+
+  document.getElementById("stamp").textContent =
+    "güncellendi " + new Date().toLocaleTimeString("tr-TR",
+      { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
+}
+
+load();
+</script>
+</body>
+</html>
