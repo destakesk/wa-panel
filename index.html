@@ -141,12 +141,16 @@ function load() {
 }
 
 function render(counts, daily) {
+  // yalnizca panelde listelenen siteler sayilir (gizli/eski anahtarlar haric)
+  var KNOWN = {};
+  SITES.forEach(function (s) { KNOWN[s.key] = 1; });
   var totals = {};
-  counts.forEach(function (r) { totals[r.site] = r.n + 1; });
+  counts.forEach(function (r) { if (KNOWN[r.site]) totals[r.site] = r.n + 1; });
 
   // gun -> toplam; site+gun -> tiklama
   var byDay = {}, bySiteDay = {};
   daily.forEach(function (r) {
+    if (!KNOWN[r.site]) return;
     byDay[r.day] = (byDay[r.day] || 0) + r.clicks;
     bySiteDay[r.site + "|" + r.day] = r.clicks;
   });
